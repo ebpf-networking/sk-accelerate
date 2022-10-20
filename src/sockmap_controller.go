@@ -22,10 +22,27 @@ func monitorServices(informerFactory informers.SharedInformerFactory, services *
     serviceInformer := informerFactory.Core().V1().Services()
     serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
         AddFunc: func(new interface{}) {
+            fmt.Println("*** Add service ***:")
+            fmt.Printf("\t[+]: ")
+            service := new.(*v1.Service)
+            fmt.Println(service)
+            *services = append(*services, service)
         },
         UpdateFunc: func(old, new interface{}) {
         },
         DeleteFunc: func(obj interface{}) {
+            fmt.Println("*** Delete service ***:")
+            fmt.Printf("\t[-]: ")
+            service := obj.(*v1.Service)
+            fmt.Println(service)
+            for i, s := range *services {
+                if ((service.ObjectMeta.Namespace == s.ObjectMeta.Namespace) && 
+                    (service.ObjectMeta.Name == s.ObjectMeta.Name)) {
+                    (*services)[i] = (*services)[len(*services)-1]
+                    *services = (*services)[:len(*services)-1]
+                    break
+                }
+            }
         },
     })
 
@@ -45,10 +62,27 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
     endpointInformer := informerFactory.Core().V1().Endpoints()
     endpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
         AddFunc: func(new interface{}) {
+            fmt.Println("*** Add endpoints ***:")
+            fmt.Printf("\t[+]: ")
+            endpoint := new.(*v1.Endpoints)
+            fmt.Println(endpoint)
+            *endpoints = append(*endpoints, endpoint)
         },
         UpdateFunc: func(old, new interface{}) {
         },
         DeleteFunc: func(obj interface{}) {
+            fmt.Println("*** Delete endpoints: ***")
+            fmt.Printf("\t[-]: ")
+            endpoint := obj.(*v1.Endpoints)
+            fmt.Println(endpoint)
+            for i, e := range *endpoints {
+                if ((endpoint.ObjectMeta.Namespace == e.ObjectMeta.Namespace) && 
+                    (endpoint.ObjectMeta.Name == e.ObjectMeta.Name)) {
+                    (*endpoints)[i] = (*endpoints)[len(*endpoints)-1]
+                    *endpoints = (*endpoints)[:len(*endpoints)-1]
+                    break
+                }
+            }
         },
     })
 
@@ -66,19 +100,18 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
 func printStats(services *[]*v1.Service, endpoints *[]*v1.Endpoints) {
 
     for {
-        fmt.Println("Services:")
+        fmt.Println("*** Services ***:")
         for i, service := range *services {
             fmt.Printf("\t[%d]: ", i)
             fmt.Println(service)
         }
 
-        fmt.Println("Endpoints:")
+        fmt.Println("*** Endpoints ***:")
         for i, endpoint := range *endpoints {
             fmt.Printf("\t[%d]: ", i)
             fmt.Println(endpoint)
         }
         time.Sleep(5*time.Second)
-
     }
 }
 
