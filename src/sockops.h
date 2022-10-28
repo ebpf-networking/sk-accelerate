@@ -60,13 +60,12 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } services_map SEC(".maps");
 
-// Endpoints are kept in a map of hash maps. The key to the outer map is the service IP.
-// The key to the inner maps are the pod IPs, and the value is a static number 0.
+// Endpoints are kept in a map of hash maps. The key to the outer map is the 
+// namespace+name pair. The key to the inner maps are the pod IPs, and the 
+// value is a static number 0.
 struct endpoint_outer_key {
-    union {
-        __u32 ip4;
-        __u32 ip6[4];
-    } ip;
+    char namespace[128];
+    char name[128];
 } __attribute__((packed));
 
 struct endpoint_inner_key {
