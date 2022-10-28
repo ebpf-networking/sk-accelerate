@@ -30,6 +30,15 @@ type service_value struct {
     Name [128]byte
 }
 
+type endpoint_outer_key struct {
+    Namespace [128]byte
+    Name [128]byte
+}
+
+type endpoint_inner_key struct {
+    IP [16]byte
+}
+
 func monitorServices(informerFactory informers.SharedInformerFactory, services *[]*v1.Service) {
 
     serviceInformer := informerFactory.Core().V1().Services()
@@ -82,6 +91,7 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             endpoint := new.(*v1.Endpoints)
             //fmt.Println(endpoint)
             *endpoints = append(*endpoints, endpoint)
+            addToEndpointsMap(endpoint)
         },
         UpdateFunc: func(old, new interface{}) {
         },
@@ -130,6 +140,8 @@ func printStats(services *[]*v1.Service, endpoints *[]*v1.Endpoints) {
     }
 }
 
+// Todo: services map could be opened once at the start and
+// passed as a parameter to these functions
 func addToServicesMap(service *v1.Service) {
     path := filepath.Join("/sys/fs/bpf", "services_map")
     m, err := ebpf.LoadPinnedMap(path, nil)
@@ -187,6 +199,46 @@ func deleteFromServicesMap(service *v1.Service) {
         fmt.Printf("service is deleted from eBPF map: %s\n", key)
     }
 }
+
+func addToEndpointsMap(endpoint *v1.Endpoints) {
+    path := filepath.Join("/sys/fs/bpf", "endpoints_map")
+    m, err := ebpf.LoadPinnedMap(path, nil)
+    if (err != nil) {
+        panic(err.Error())
+    }
+    defer m.Close()
+
+    var namespace [128]byte
+    var name [128]byte
+    copy(namespace[:], endpoint.ObjectMeta.Namespace)
+    copy(name[:], endpoint.ObjectMeta.Name)
+
+    subsets := endpoint.Subsets
+    if (subsets == nil) {
+        return;
+    }
+
+    for _, subset := range subsets {
+        addresses := subset.Addresses
+        if (addresses == nil) {
+            continue
+        }
+
+        var value uint32
+        for _, address := range addresses {
+            fmt.Printf("%s:%s -> %s\n", namespace, name, address.IP)
+
+            key := endpoint_outer_key{Namespace: namespace, Name: name}
+            err = m.Lookup(key, &value)
+            if errors.Is(err, ebpf.ErrKeyNotExist) {
+                fmt.Println("key not found")
+            } else {
+                fmt.Println("key was found")
+            }
+        }
+    }
+}
+
 func main() {
     var kubeconfig *string
     if home := homedir.HomeDir(); home != "" {
