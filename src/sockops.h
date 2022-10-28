@@ -10,7 +10,7 @@
 #define READ_ONCE(x)        (*(volatile typeof(x) *)&x)
 #endif
 
-// hash key to the sock_ops_map. Supports both ipv4 and ipv6
+// Hash key to the sock_ops_map. Supports both ipv4 and ipv6
 struct sock_key {
     union {
         __u32 ip4;
@@ -39,7 +39,7 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } sock_ops_map SEC(".maps") ;
 
-// hash key to the services_map. Supports both ipv4 and ipv6
+// Hash key to the services_map. Supports both ipv4 and ipv6
 struct service_key {
     union {
         __u32 ip4;
@@ -58,5 +58,37 @@ struct {
     __type(key, struct service_key);        // dst service IP
     __type(value, struct service_value);    // service namespace + name
     __uint(pinning, LIBBPF_PIN_BY_NAME);
-} services_map SEC(".maps") ;
+} services_map SEC(".maps");
 
+// Endpoints are kept in a map of hash maps. The key to the outer map is the service IP.
+// The key to the inner maps are the pod IPs, and the value is a static number 0.
+struct endpoint_outer_key {
+    union {
+        __u32 ip4;
+        __u32 ip6[4];
+    } ip;
+} __attribute__((packed));
+
+struct endpoint_inner_key {
+    union {
+        __u32 ip4;
+        __u32 ip6[4];
+    } ip;
+} __attribute__((packed));
+
+struct endpoints_inner_map {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 128);
+    __type(key, struct endpoint_inner_key);
+    __type(value, __u32);
+} endpoints_inner_map SEC(".maps");
+
+// BPF_MAP_TYPE_HASH_OF_MAPS was introduced in kernel 4.12, so any recent kernel should support it
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);
+    __uint(max_entries, 1024);
+    __type(key, struct endpoint_outer_key);
+    __type(value, __u32);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __array(values, struct endpoints_inner_map);
+} endpoints_map SEC(".maps");
