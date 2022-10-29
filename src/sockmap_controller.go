@@ -19,6 +19,7 @@ import (
     "k8s.io/client-go/rest"
 
     "github.com/cilium/ebpf"
+    "github.com/cilium/ebpf/rlimit"
 )
 
 type service_key struct {
@@ -226,11 +227,35 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
 
         var value uint32
         for _, address := range addresses {
-            fmt.Printf("%s:%s -> %s\n", namespace, name, address.IP)
+            ip := net.ParseIP(address.IP)
+            fmt.Printf("%s:%s -> %s\n", namespace, name, ip) 
 
-            key := endpoint_outer_key{Namespace: namespace, Name: name}
-            err = m.Lookup(key, &value)
+            outer_key := endpoint_outer_key{Namespace: namespace, Name: name}
+            err = m.Lookup(outer_key, &value)
             if errors.Is(err, ebpf.ErrKeyNotExist) {
+                h, err := ebpf.NewMap(&ebpf.MapSpec{
+                    Type:       ebpf.Hash,
+                    KeySize:    16,
+                    ValueSize:  4,
+                    MaxEntries: 128,
+                })
+                defer h.Close()
+                if (err != nil) {
+                    panic(err)
+                }
+
+                inner_key := ip.To16()
+                inner_value := uint32(0)
+                err = h.Put(inner_key, inner_value)
+                if (err != nil) {
+                    panic(err)
+                }
+                fd := uint32(h.FD())
+                err = m.Put(outer_key, fd)
+                if (err != nil) {
+                    panic(err)
+                }
+
                 fmt.Println("key not found")
             } else {
                 fmt.Println("key was found")
@@ -240,6 +265,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
 }
 
 func main() {
+    rlimit.RemoveMemlock()
     var kubeconfig *string
     if home := homedir.HomeDir(); home != "" {
         kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
