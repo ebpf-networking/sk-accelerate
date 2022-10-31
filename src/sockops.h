@@ -101,15 +101,15 @@ struct endpoints_ports_outer_key {
 } __attribute__((packed));
 
 struct endpoints_ports_inner_key {
-    int32 port
+    int port;
 } __attribute__((packed));
 
 struct endpoints_ports_inner_map {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 128);
-    __type(key, struct endpoints_ips_inner_key);
+    __type(key, struct endpoints_ports_inner_key);
     __type(value, __u32);
-} endpoints_ips_inner_map SEC(".maps");
+} endpoints_ports_inner_map SEC(".maps");
 
 // BPF_MAP_TYPE_HASH_OF_MAPS was introduced in kernel 4.12, so any recent kernel should support it
 struct {
@@ -119,6 +119,6 @@ struct {
     __type(value, __u32);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
     __array(values, struct endpoints_ports_inner_map);
-} endpoints_ips_map SEC(".maps");
+} endpoints_ports_map SEC(".maps");
 
 
