@@ -53,6 +53,7 @@ func monitorServices(informerFactory informers.SharedInformerFactory, services *
             addToServicesMap(service)
         },
         UpdateFunc: func(old, new interface{}) {
+            // Do we need to implement anything here as data is usually static?
         },
         DeleteFunc: func(obj interface{}) {
             //fmt.Println("*** Delete service ***:")
@@ -92,9 +93,14 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             endpoint := new.(*v1.Endpoints)
             //fmt.Println(endpoint)
             *endpoints = append(*endpoints, endpoint)
+            // This call usually returns as endpoint.Subsets is usually empty at this time
             addToEndpointsMap(endpoint)
         },
         UpdateFunc: func(old, new interface{}) {
+            // Do we need to delete 'old' before adding 'new'?
+            endpoint := new.(*v1.Endpoints)
+            *endpoints = append(*endpoints, endpoint)
+            addToEndpointsMap(endpoint)
         },
         DeleteFunc: func(obj interface{}) {
             //fmt.Println("*** Delete endpoints: ***")
