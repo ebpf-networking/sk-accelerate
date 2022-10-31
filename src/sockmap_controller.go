@@ -202,12 +202,19 @@ func deleteFromServicesMap(service *v1.Service) {
 }
 
 func addToEndpointsMap(endpoint *v1.Endpoints) {
-    path := filepath.Join("/sys/fs/bpf", "endpoints_map")
+    path := filepath.Join("/sys/fs/bpf", "endpoints_ips_map")
     m, err := ebpf.LoadPinnedMap(path, nil)
     if (err != nil) {
         panic(err.Error())
     }
     defer m.Close()
+
+    path = filepath.Join("/sys/fs/bpf", "endpoints_ports_map")
+    n, err := ebpf.LoadPinnedMap(path, nil)
+    if (err != nil) {
+        panic(err.Error())
+    }
+    defer n.Close()
 
     var namespace [128]byte
     var name [128]byte
@@ -219,6 +226,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
         return;
     }
 
+    // Populate endpoints_ips_map
     for _, subset := range subsets {
         addresses := subset.Addresses
         if (addresses == nil) {
@@ -226,39 +234,112 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
         }
 
         var value uint32
-        for _, address := range addresses {
-            ip := net.ParseIP(address.IP)
-            fmt.Printf("%s:%s -> %s\n", namespace, name, ip) 
+        outer_key := endpoint_outer_key{Namespace: namespace, Name: name}
+        err = m.Lookup(outer_key, &value)
+        if errors.Is(err, ebpf.ErrKeyNotExist) {
+            // Handling new endpoints to a new service
+            fmt.Println("adding a new service (%s:%s) to endpoints_ips_map", namespace, name)
+            h, err := ebpf.NewMap(&ebpf.MapSpec{
+                Type:       ebpf.Hash,
+                KeySize:    16,
+                ValueSize:  4,
+                MaxEntries: 128,
+            })
+            defer h.Close()
+            if (err != nil) {
+                panic(err)
+            }
 
-            outer_key := endpoint_outer_key{Namespace: namespace, Name: name}
+            fd := uint32(h.FD())
+            err = m.Put(outer_key, fd)
+            if (err != nil) {
+                panic(err)
+            }
+        } else {
+            fmt.Println("found an existing service (%s:%s) in endpoints_ips_map", namespace, name)
+        }
+
+        if (value <= 0) {
             err = m.Lookup(outer_key, &value)
             if errors.Is(err, ebpf.ErrKeyNotExist) {
-                h, err := ebpf.NewMap(&ebpf.MapSpec{
-                    Type:       ebpf.Hash,
-                    KeySize:    16,
-                    ValueSize:  4,
-                    MaxEntries: 128,
-                })
-                defer h.Close()
-                if (err != nil) {
-                    panic(err)
-                }
+                panic("expect to find the key in events_ips_map but didn't")
+            }
+        }
 
-                inner_key := ip.To16()
-                inner_value := uint32(0)
-                err = h.Put(inner_key, inner_value)
-                if (err != nil) {
-                    panic(err)
-                }
-                fd := uint32(h.FD())
-                err = m.Put(outer_key, fd)
-                if (err != nil) {
-                    panic(err)
-                }
+        h, err := ebpf.NewMapFromID(ebpf.MapID(value))
+        if (err != nil) {
+            panic("expect to find inner map from events_ips_map but didn't")
+        }
+        defer h.Close()
 
-                fmt.Println("key not found")
-            } else {
-                fmt.Println("key was found")
+        for _, address := range addresses {
+            ip := net.ParseIP(address.IP)
+            fmt.Printf("adding a new endpoint IP address to service (%s:%s) -> %s\n", namespace, name, ip) 
+
+            inner_key := ip.To16()
+            inner_value := uint32(0)
+            err = h.Put(inner_key, inner_value)
+            if (err != nil) {
+                panic(err)
+            }
+        }
+    }
+
+    // Populate endpoints_ports_map
+    for _, subset := range subsets {
+        ports := subset.Ports
+        if (ports == nil) {
+            continue
+        }
+
+        var value uint32
+        outer_key := endpoint_outer_key{Namespace: namespace, Name: name}
+        err = n.Lookup(outer_key, &value)
+        if errors.Is(err, ebpf.ErrKeyNotExist) {
+            // Handling new endpoints to a new service
+            fmt.Println("adding a new service (%s:%s) to endpoints_ports_map", namespace, name)
+            h, err := ebpf.NewMap(&ebpf.MapSpec{
+                Type:       ebpf.Hash,
+                KeySize:    16,
+                ValueSize:  4,
+                MaxEntries: 128,
+            })
+            defer h.Close()
+            if (err != nil) {
+                panic(err)
+            }
+
+            fd := uint32(h.FD())
+            err = n.Put(outer_key, fd)
+            if (err != nil) {
+                panic(err)
+            }
+        } else {
+            fmt.Println("found an existing service (%s:%s) in endpoints_ports_map", namespace, name)
+        }
+
+        if (value <= 0) {
+            err = n.Lookup(outer_key, &value)
+            if errors.Is(err, ebpf.ErrKeyNotExist) {
+                panic("expect to find the key in events_ports_map but didn't")
+            }
+        }
+
+        h, err := ebpf.NewMapFromID(ebpf.MapID(value))
+        if (err != nil) {
+            panic("expect to find inner map from events_ips_map but didn't")
+        }
+        defer h.Close()
+
+        for _, port := range ports {
+            portNum := port.Port
+            fmt.Printf("adding a new endpoint port to service (%s:%s) -> %d\n", namespace, name, port)
+
+            inner_key := portNum
+            inner_value := uint32(0)
+            err = h.Put(inner_key, inner_value)
+            if (err != nil) {
+                panic(err)
             }
         }
     }

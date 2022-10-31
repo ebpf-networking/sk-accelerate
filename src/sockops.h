@@ -60,34 +60,65 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } services_map SEC(".maps");
 
-// Endpoints are kept in a map of hash maps. The key to the outer map is the 
+// Endpoints IPs are kept in a map of hash maps. The key to the outer map is the 
 // namespace+name pair. The key to the inner maps are the pod IPs, and the 
 // value is a static number 0.
-struct endpoint_outer_key {
+struct endpoints_ips_outer_key {
     char namespace[128];
     char name[128];
 } __attribute__((packed));
 
-struct endpoint_inner_key {
+struct endpoints_ips_inner_key {
     union {
         __u32 ip4;
         __u32 ip6[4];
     } ip;
 } __attribute__((packed));
 
-struct endpoints_inner_map {
+struct endpoints_ips_inner_map {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 128);
-    __type(key, struct endpoint_inner_key);
+    __type(key, struct endpoints_ips_inner_key);
     __type(value, __u32);
-} endpoints_inner_map SEC(".maps");
+} endpoints_ips_inner_map SEC(".maps");
 
 // BPF_MAP_TYPE_HASH_OF_MAPS was introduced in kernel 4.12, so any recent kernel should support it
 struct {
     __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);
     __uint(max_entries, 1024);
-    __type(key, struct endpoint_outer_key);
+    __type(key, struct endpoints_ips_outer_key);
     __type(value, __u32);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
-    __array(values, struct endpoints_inner_map);
-} endpoints_map SEC(".maps");
+    __array(values, struct endpoints_ips_inner_map);
+} endpoints_ips_map SEC(".maps");
+
+// Endpoints Ports are kept in a map of hash maps. The key to the outer map is the 
+// namespace+name pair. The key to the inner maps are the ports, and the 
+// value is a static number 0.
+struct endpoints_ports_outer_key {
+    char namespace[128];
+    char name[128];
+} __attribute__((packed));
+
+struct endpoints_ports_inner_key {
+    int32 port
+} __attribute__((packed));
+
+struct endpoints_ports_inner_map {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 128);
+    __type(key, struct endpoints_ips_inner_key);
+    __type(value, __u32);
+} endpoints_ips_inner_map SEC(".maps");
+
+// BPF_MAP_TYPE_HASH_OF_MAPS was introduced in kernel 4.12, so any recent kernel should support it
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);
+    __uint(max_entries, 1024);
+    __type(key, struct endpoints_ports_outer_key);
+    __type(value, __u32);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+    __array(values, struct endpoints_ports_inner_map);
+} endpoints_ips_map SEC(".maps");
+
+
