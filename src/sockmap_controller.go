@@ -238,7 +238,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
         err = m.Lookup(outer_key, &value)
         if errors.Is(err, ebpf.ErrKeyNotExist) {
             // Handling new endpoints to a new service
-            fmt.Println("adding a new service (%s:%s) to endpoints_ips_map", namespace, name)
+            fmt.Printf("adding a new service (%s:%s) to endpoints_ips_map\n", namespace, name)
             h, err := ebpf.NewMap(&ebpf.MapSpec{
                 Type:       ebpf.Hash,
                 KeySize:    16,
@@ -256,7 +256,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
                 panic(err)
             }
         } else {
-            fmt.Println("found an existing service (%s:%s) in endpoints_ips_map", namespace, name)
+            fmt.Printf("found an existing service (%s:%s) in endpoints_ips_map\n", namespace, name)
         }
 
         if (value <= 0) {
@@ -297,10 +297,10 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
         err = n.Lookup(outer_key, &value)
         if errors.Is(err, ebpf.ErrKeyNotExist) {
             // Handling new endpoints to a new service
-            fmt.Println("adding a new service (%s:%s) to endpoints_ports_map", namespace, name)
+            fmt.Printf("adding a new service (%s:%s) to endpoints_ports_map\n", namespace, name)
             h, err := ebpf.NewMap(&ebpf.MapSpec{
                 Type:       ebpf.Hash,
-                KeySize:    16,
+                KeySize:    4,
                 ValueSize:  4,
                 MaxEntries: 128,
             })
@@ -315,7 +315,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
                 panic(err)
             }
         } else {
-            fmt.Println("found an existing service (%s:%s) in endpoints_ports_map", namespace, name)
+            fmt.Print("found an existing service (%s:%s) in endpoints_ports_map\n", namespace, name)
         }
 
         if (value <= 0) {
