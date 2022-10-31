@@ -333,7 +333,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
 
         for _, port := range ports {
             portNum := port.Port
-            fmt.Printf("adding a new endpoint port to service (%s:%s) -> %d\n", namespace, name, port)
+            fmt.Printf("adding a new endpoint port to service (%s:%s) -> %d\n", namespace, name, portNum)
 
             inner_key := portNum
             inner_value := uint32(0)
