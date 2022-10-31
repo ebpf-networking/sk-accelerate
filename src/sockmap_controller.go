@@ -315,7 +315,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
                 panic(err)
             }
         } else {
-            fmt.Print("found an existing service (%s:%s) in endpoints_ports_map\n", namespace, name)
+            fmt.Printf("found an existing service (%s:%s) in endpoints_ports_map\n", namespace, name)
         }
 
         if (value <= 0) {
