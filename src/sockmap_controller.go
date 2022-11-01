@@ -54,8 +54,10 @@ func monitorServices(informerFactory informers.SharedInformerFactory, services *
         },
         UpdateFunc: func(old, new interface{}) {
             // Do we need to implement anything here as data is usually static?
+            /*
             deleteFromServicesMap(old.(*v1.Service))
             addToServicesMap(new.(*v1.Service))
+            */
         },
         DeleteFunc: func(obj interface{}) {
             //fmt.Println("*** Delete service ***:")
@@ -99,23 +101,27 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             addToEndpointsMap(endpoint)
         },
         UpdateFunc: func(old, new interface{}) {
-            // Do we need to delete 'old' before adding 'new'?
-            o := old.(*v1.Endpoints)
-            for i, e := range *endpoints {
+            oldEndpoint := old.(*v1.Endpoints)
+            newEndpoint := new.(*v1.Endpoints)
+            if (len(oldEndpoint.Subsets) != len(newEndpoint.Subsets)) {
+                o := old.(*v1.Endpoints)
+                for i, e := range *endpoints {
                 if ((o.ObjectMeta.Namespace == e.ObjectMeta.Namespace) && 
                     (o.ObjectMeta.Name == e.ObjectMeta.Name)) {
                     (*endpoints)[i] = (*endpoints)[len(*endpoints)-1]
                     *endpoints = (*endpoints)[:len(*endpoints)-1]
                     break
                 }
-            }
-            deleteFromEndpointsMap(o)
+                }
+                deleteFromEndpointsMap(o)
 
-            n := new.(*v1.Endpoints)
-            *endpoints = append(*endpoints, n)
-            addToEndpointsMap(n)
+                n := new.(*v1.Endpoints)
+                *endpoints = append(*endpoints, n)
+                addToEndpointsMap(n)
+            }
         },
         DeleteFunc: func(obj interface{}) {
+            // This is not very useful as endpoint.Subsets is empty at this point
             //fmt.Println("*** Delete endpoints: ***")
             //fmt.Printf("\t[-]: ")
             endpoint := obj.(*v1.Endpoints)
