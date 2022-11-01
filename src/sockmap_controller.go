@@ -54,6 +54,8 @@ func monitorServices(informerFactory informers.SharedInformerFactory, services *
         },
         UpdateFunc: func(old, new interface{}) {
             // Do we need to implement anything here as data is usually static?
+            deleteFromServicesMap(old.(*v1.Service))
+            addToServicesMap(new.(*v1.Service))
         },
         DeleteFunc: func(obj interface{}) {
             //fmt.Println("*** Delete service ***:")
@@ -98,9 +100,20 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
         },
         UpdateFunc: func(old, new interface{}) {
             // Do we need to delete 'old' before adding 'new'?
-            endpoint := new.(*v1.Endpoints)
-            *endpoints = append(*endpoints, endpoint)
-            addToEndpointsMap(endpoint)
+            o := old.(*v1.Endpoints)
+            for i, e := range *endpoints {
+                if ((o.ObjectMeta.Namespace == e.ObjectMeta.Namespace) && 
+                    (o.ObjectMeta.Name == e.ObjectMeta.Name)) {
+                    (*endpoints)[i] = (*endpoints)[len(*endpoints)-1]
+                    *endpoints = (*endpoints)[:len(*endpoints)-1]
+                    break
+                }
+            }
+            deleteFromEndpointsMap(o)
+
+            n := new.(*v1.Endpoints)
+            *endpoints = append(*endpoints, n)
+            addToEndpointsMap(n)
         },
         DeleteFunc: func(obj interface{}) {
             //fmt.Println("*** Delete endpoints: ***")
@@ -115,6 +128,7 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
                     break
                 }
             }
+            deleteFromEndpointsMap(endpoint)
         },
     })
 
@@ -175,9 +189,9 @@ func addToServicesMap(service *v1.Service) {
         if (err != nil) {
             panic(err.Error())
         }
-        fmt.Printf("adding service to eBPF map: %s -> %s\n", key, value)
+        fmt.Printf("adding service to services_map: %s -> %s\n", key, value)
     } else {
-        fmt.Printf("service is already in eBPF map: %s\n", key)
+        fmt.Printf("service is already in services_map: %s\n", key)
     }
 }
 
@@ -201,9 +215,9 @@ func deleteFromServicesMap(service *v1.Service) {
     key := ip.To16()
     err = m.Delete(key)
     if errors.Is(err, ebpf.ErrKeyNotExist) {
-        fmt.Printf("service does not exist in eBPF map: %s\n", key)
+        fmt.Printf("service does not exist in services_map: %s\n", key)
     } else {
-        fmt.Printf("service is deleted from eBPF map: %s\n", key)
+        fmt.Printf("service is deleted from services_map: %s\n", key)
     }
 }
 
@@ -244,7 +258,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
         err = m.Lookup(outer_key, &value)
         if errors.Is(err, ebpf.ErrKeyNotExist) {
             // Handling new endpoints to a new service
-            fmt.Printf("adding a new service (%s:%s) to endpoints_ips_map\n", namespace, name)
+            fmt.Printf("adding a new service to endpoints_ips_map: %s:%s\n", namespace, name)
             h, err := ebpf.NewMap(&ebpf.MapSpec{
                 Type:       ebpf.Hash,
                 KeySize:    16,
@@ -262,25 +276,25 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
                 panic(err)
             }
         } else {
-            fmt.Printf("found an existing service (%s:%s) in endpoints_ips_map\n", namespace, name)
+            fmt.Printf("service already exists in endpoints_ips_map: %s:%s\n", namespace, name)
         }
 
         if (value <= 0) {
             err = m.Lookup(outer_key, &value)
             if errors.Is(err, ebpf.ErrKeyNotExist) {
-                panic("expect to find the key in events_ips_map but didn't")
+                panic("expect to find the key in endpoints_ips_map but didn't")
             }
         }
 
         h, err := ebpf.NewMapFromID(ebpf.MapID(value))
         if (err != nil) {
-            panic("expect to find inner map from events_ips_map but didn't")
+            panic("expect to find inner map from endpoints_ips_map but didn't")
         }
         defer h.Close()
 
         for _, address := range addresses {
             ip := net.ParseIP(address.IP)
-            fmt.Printf("adding a new endpoint IP address to service (%s:%s) -> %s\n", namespace, name, ip) 
+            fmt.Printf("adding a new endpoint IP address to endpoints_ips_map: %s:%s -> %s\n", namespace, name, ip) 
 
             inner_key := ip.To16()
             inner_value := uint32(0)
@@ -303,7 +317,7 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
         err = n.Lookup(outer_key, &value)
         if errors.Is(err, ebpf.ErrKeyNotExist) {
             // Handling new endpoints to a new service
-            fmt.Printf("adding a new service (%s:%s) to endpoints_ports_map\n", namespace, name)
+            fmt.Printf("adding a new service to endpoints_ports_map: %s:%s\n", namespace, name)
             h, err := ebpf.NewMap(&ebpf.MapSpec{
                 Type:       ebpf.Hash,
                 KeySize:    4,
@@ -321,29 +335,151 @@ func addToEndpointsMap(endpoint *v1.Endpoints) {
                 panic(err)
             }
         } else {
-            fmt.Printf("found an existing service (%s:%s) in endpoints_ports_map\n", namespace, name)
+            fmt.Printf("service already exists in endpoints_ports_map: %s:%s\n", namespace, name)
         }
 
         if (value <= 0) {
             err = n.Lookup(outer_key, &value)
             if errors.Is(err, ebpf.ErrKeyNotExist) {
-                panic("expect to find the key in events_ports_map but didn't")
+                panic("expect to find the key in endpoints_ports_map but didn't")
             }
         }
 
         h, err := ebpf.NewMapFromID(ebpf.MapID(value))
         if (err != nil) {
-            panic("expect to find inner map from events_ips_map but didn't")
+            panic("expect to find inner map from endpoints_ports_map but didn't")
         }
         defer h.Close()
 
         for _, port := range ports {
+            // We only handle TCP and TCP is default is Protocol field is not specified
+            if (port.Protocol != "" && port.Protocol != "TCP") {
+                continue
+            }
             portNum := port.Port
-            fmt.Printf("adding a new endpoint port to service (%s:%s) -> %d\n", namespace, name, portNum)
+            fmt.Printf("adding a new endpoint port to endpoints_ports_map: %s:%s -> %d\n", namespace, name, portNum)
 
             inner_key := portNum
             inner_value := uint32(0)
             err = h.Put(inner_key, inner_value)
+            if (err != nil) {
+                panic(err)
+            }
+        }
+    }
+}
+
+func deleteFromEndpointsMap(endpoint *v1.Endpoints) {
+
+    path := filepath.Join("/sys/fs/bpf", "endpoints_ips_map")
+    m, err := ebpf.LoadPinnedMap(path, nil)
+    if (err != nil) {
+        panic(err.Error())
+    }
+    defer m.Close()
+
+    path = filepath.Join("/sys/fs/bpf", "endpoints_ports_map")
+    n, err := ebpf.LoadPinnedMap(path, nil)
+    if (err != nil) {
+        panic(err.Error())
+    }
+    defer n.Close()
+
+    var namespace [128]byte
+    var name [128]byte
+    copy(namespace[:], endpoint.ObjectMeta.Namespace)
+    copy(name[:], endpoint.ObjectMeta.Name)
+
+    subsets := endpoint.Subsets
+    if (subsets == nil) {
+        return;
+    }
+
+    // Delete from endpoints_ips_map
+    for _, subset := range subsets {
+        addresses := subset.Addresses
+        if (addresses == nil) {
+            continue
+        }
+
+        var value uint32
+        outer_key := endpoint_outer_key{Namespace: namespace, Name: name}
+        err = m.Lookup(outer_key, &value)
+        if errors.Is(err, ebpf.ErrKeyNotExist) {
+            continue
+        }
+
+        h, err := ebpf.NewMapFromID(ebpf.MapID(value))
+        if (err != nil) {
+            panic("expect to find inner map from endpoints_ips_map but didn't")
+        }
+        defer h.Close()
+
+        for _, address := range addresses {
+            ip := net.ParseIP(address.IP)
+            fmt.Printf("deleting an endpoint IP address from endpoints_ips_map: %s:%s -> %s\n", namespace, name, ip) 
+
+            inner_key := ip.To16()
+            err = h.Delete(inner_key)
+            if (err != nil) {
+                panic(err)
+            }
+        }
+
+        b, err := h.NextKeyBytes(nil)
+        if (err != nil) {
+            panic(err)
+        }
+        if (b == nil) {
+            err = m.Delete(outer_key)
+            if (err != nil) {
+                panic(err)
+            }
+        }
+    }
+
+    // Delete from endpoints_port_map
+    for _, subset := range subsets {
+        ports := subset.Ports
+        if (ports == nil) {
+            continue
+        }
+
+        var value uint32
+        outer_key := endpoint_outer_key{Namespace: namespace, Name: name}
+        err = n.Lookup(outer_key, &value)
+        if errors.Is(err, ebpf.ErrKeyNotExist) {
+            continue
+        }
+
+        h, err := ebpf.NewMapFromID(ebpf.MapID(value))
+        if (err != nil) {
+            panic("expect to find inner map from endpoints_ports_map but didn't")
+        }
+        defer h.Close()
+
+        for _, port := range ports {
+            // We only handle TCP and TCP is default is Protocol field is not specified
+            if (port.Protocol != "" && port.Protocol != "TCP") {
+                continue
+            }
+
+            portNum := port.Port
+            fmt.Printf("deleting an endpoint port from endpoints_ports_map: %s:%s -> %d\n", namespace, name, portNum)
+
+            inner_key := portNum
+            err = h.Delete(inner_key)
+            if (err != nil) {
+                panic(err)
+            }
+        }
+
+        b, err := h.NextKeyBytes(nil)
+        if (err != nil) {
+            panic(err)
+        }
+        if (b == nil) {
+            err = n.Delete(outer_key)
             if (err != nil) {
                 panic(err)
             }
@@ -381,7 +517,7 @@ func main() {
 
     go monitorServices(informerFactory, &services)
     go monitorEndpoints(informerFactory, &endpoints)
-    go printStats(&services, &endpoints)
+    //go printStats(&services, &endpoints)
 
     for {
         time.Sleep(time.Duration(1<<63 - 1))
