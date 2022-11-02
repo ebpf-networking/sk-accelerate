@@ -8,19 +8,19 @@
 /* extract the key that identifies the destination socket in the sock_ops_map */
 static inline
 void sk_msg_extract4_key(struct sk_msg_md *msg,
-	struct sock_key *key)
+    struct sock_key *key)
 {
-	key->src.ip4 = msg->remote_ip4;
-	key->dst.ip4 = msg->local_ip4;
-	key->family = 2;
+    key->src.ip4 = msg->remote_ip4;
+    key->dst.ip4 = msg->local_ip4;
+    key->family = 2;
 
-	key->dport = (bpf_htonl(msg->local_port) >> 16);
-	key->sport = READ_ONCE(msg->remote_port) >> 16;
+    key->dport = (bpf_htonl(msg->local_port) >> 16);
+    key->sport = READ_ONCE(msg->remote_port) >> 16;
 }
 
 static inline
 void sk_msg_extract6_key(struct sk_msg_md *msg,
-	struct sock_key *key)
+    struct sock_key *key)
 {
     //__builtin_memset((void*)&key->dst.ip6, 0, 32);
     //__builtin_memset((void*)&key->src.ip6, 0, 32);
@@ -34,10 +34,10 @@ void sk_msg_extract6_key(struct sk_msg_md *msg,
     key->dst.ip6[1] = msg->local_ip6[1];
     key->dst.ip6[2] = msg->local_ip6[2];
     key->dst.ip6[3] = msg->local_ip6[3];
-	key->family = 10;
+    key->family = 10;
 
-	key->dport = (bpf_htonl(msg->local_port) >> 16);
-	key->sport = READ_ONCE(msg->remote_port) >> 16;
+    key->dport = (bpf_htonl(msg->local_port) >> 16);
+    key->sport = READ_ONCE(msg->remote_port) >> 16;
 }
 
 SEC("sk_msg")
