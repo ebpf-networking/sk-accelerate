@@ -10,7 +10,7 @@ import (
 
     "k8s.io/api/core/v1"
     "k8s.io/apimachinery/pkg/util/wait"
-    //"k8s.io/apimachinery/pkg/labels"
+    "k8s.io/apimachinery/pkg/labels"
     "k8s.io/client-go/informers"
     client_go_v1 "k8s.io/client-go/informers/core/v1"
     "k8s.io/client-go/kubernetes"
@@ -24,13 +24,13 @@ import (
 )
 
 type map_key struct {
-    IP net.IP
+    IP [16]byte
     Pad uint32
     Port int32
 }
 
 type map_value struct {
-    IP net.IP
+    IP [16]byte
     Pad uint32
     Port int32
 }
@@ -70,12 +70,12 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             fmt.Println("Updatefunc")
             o := old.(*v1.Endpoints)
             n := new.(*v1.Endpoints)
-            if ((len(o.Subsets) != len(n.Subsets)) && 
-                (o.ObjectMeta.Namespace == n.ObjectMeta.Namespace) &&
-                (o.ObjectMeta.Name == n.ObjectMeta.Name)) {
+            if (len(o.Subsets) != len(n.Subsets)) {
+                fmt.Printf("old: %s\n", o)
+                fmt.Printf("new: %s\n", n)
                 key := o.ObjectMeta.Namespace + ":" + o.ObjectMeta.Name
                 endpoints[key] = n
-                deleteEndpointFromMap(o)
+                deleteEndpointFromMap(o, serviceInformer)
                 addEndpointToMap(n, serviceInformer)
             }
         },
@@ -87,15 +87,29 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             name := endpoint.ObjectMeta.Name
             key := namespace + ":" + name
             delete(endpoints, key)
-            deleteEndpointFromMap(endpoint)
+            deleteEndpointFromMap(endpoint, serviceInformer)
         },
     })
 
     informerFactory.Start(wait.NeverStop)
     informerFactory.WaitForCacheSync(wait.NeverStop)
+
+    current, err := endpointInformer.Lister().Endpoints("").List(labels.Everything())
+    if (err == nil) {
+        for _, c := range current {
+            namespace := c.ObjectMeta.Namespace
+            name := c.ObjectMeta.Name
+            key := namespace + ":" + name
+            endpoints[key] = c
+            addEndpointToMap(c, serviceInformer)
+        }
+    } else {
+        panic(err.Error())
+    }
 }
 
 func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
+    fmt.Println("addEndpointToMap")
     service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
     if (err != nil) {
         return
@@ -110,11 +124,6 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
     if (serviceIP == nil) {
         return
     }
-
-    var namespace [128]byte
-    var name [128]byte
-    copy(namespace[:], endpoint.ObjectMeta.Namespace)
-    copy(name[:], endpoint.ObjectMeta.Name)
 
     subsets := endpoint.Subsets
     if (subsets == nil) {
@@ -148,18 +157,22 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
                 // TODO: TargetPort could be an name, for now we assume it is a number
                 podPort := int32(port.TargetPort.IntValue())
 
-                key := map_key{IP: podIP.To16(), Pad: 0, Port: podPort}
+                var podIPKey [16]byte
+                copy (podIPKey[:], podIP)
+                key := map_key{IP: podIPKey, Pad: 0, Port: podPort}
                 var value map_value;
                 err := m.Lookup(key, &value)
+                var serviceIPKey [16]byte
+                copy(serviceIPKey[:], serviceIP)
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
-                    value := map_value{IP: serviceIP.To16(), Pad: 0, Port: servicePort}
+                    value := map_value{IP: serviceIPKey, Pad: 0, Port: servicePort}
                     err = m.Put(key, value)
                     if (err != nil) {
                         panic(err.Error())
                     }
-                    fmt.Printf("(+) %s -> %s\n", key, value)
+                    fmt.Printf("(+) %s:%d -> %s:%d\n", podIP, podPort, net.IP(value.IP[:]), value.Port)
                 } else {
-                    fmt.Printf("(.) key already exists: %s\n", key)
+                    fmt.Printf("(.) key already exists and cannot be added: %s:%d\n", podIP, podPort)
                 }
             }
         }
@@ -167,7 +180,66 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
     return
 }
 
-func deleteEndpointFromMap(endpoint *v1.Endpoints) {
+func deleteEndpointFromMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
+    fmt.Println("deleteEndpointFromMap")
+    service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
+    if (err != nil) {
+        return
+    }
+
+    servicePorts := service.Spec.Ports
+    if (len(servicePorts) == 0) {
+        return
+    }
+
+    serviceIP := net.ParseIP(service.Spec.ClusterIP)
+    if (serviceIP == nil) {
+        return
+    }
+
+    subsets := endpoint.Subsets
+    if (subsets == nil) {
+        return
+    }
+
+    path := filepath.Join("/sys/fs/bpf", "endpoints_to_service_map")
+    m, err := ebpf.LoadPinnedMap(path, nil)
+    if (err != nil) {
+        panic(err.Error())
+    }
+    defer m.Close()
+
+    // Delete from endpoints_to_service_map
+    for _, subset := range subsets {
+        addresses := subset.Addresses
+        if (addresses == nil) {
+            continue
+        }
+
+        for _, address := range addresses {
+            podIP := net.ParseIP(address.IP)
+            
+            for _, port := range servicePorts {
+                // We only handle TCP and TCP is default if the Protocol field is not specified
+                if (port.Protocol != "" && port.Protocol != "TCP") {
+                    continue
+                }
+
+                // TODO: TargetPort could be an name, for now we assume it is a number
+                podPort := int32(port.TargetPort.IntValue())
+
+                var podIPKey [16]byte
+                copy (podIPKey[:], podIP)
+                key := map_key{IP: podIPKey, Pad: 0, Port: podPort}
+                err := m.Delete(key)
+                if errors.Is(err, ebpf.ErrKeyNotExist) {
+                    fmt.Printf("(.) key doesn't exist and cannot be deleted: %s:%d\n", podIP, podPort)
+                } else {
+                    fmt.Printf("(-) %s:%d\n", podIP, podPort)
+                }
+            }
+        }
+    }
     return
 }
 
@@ -206,7 +278,7 @@ func main() {
 
     endpoints := make(map[string]*v1.Endpoints)
     go monitorEndpoints(informerFactory, endpoints)
-    go printEndpoints(endpoints)
+    //go printEndpoints(endpoints)
 
     for {
         time.Sleep(time.Duration(1<<63 - 1))
