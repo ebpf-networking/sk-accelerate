@@ -31,13 +31,53 @@ void sk_extractv4_key(struct bpf_sock_ops *ops,
 }
 
 static inline
+struct endpoints_to_service_value* is_endpoint(struct sock_key *key) {
+    struct endpoints_to_service_key map_key;
+    map_key.ip = key->src.ip4;
+    map_key.port = key->sport;
+    return bpf_map_lookup_elem(&endpoints_to_service_map, &map_key);
+}
+
+static inline
 void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
 {
     struct sock_key key = {};
+    struct endpoints_to_service_value *peer;
 
     sk_extractv4_key(skops, &key);
     if (!sk_is_local(&key))
         return;
+
+    peer = is_endpoint(&key);
+    if (peer) {
+        struct sock_key key1 = {};
+        struct bpf_sock *socket;
+
+        key1.src.ip4 = key.dst.ip4;
+        key1.sport = key.dport;
+        key1.family = key.family;
+        key1.dst.ip4 = peer->ip;
+        key1.dport = peer->port;
+
+        socket = bpf_map_lookup_elem(&sock_ops_map, &key1);
+        if (socket) {
+            struct sock_key key2 = {};
+            key2.src.ip4 = key.dst.ip4;
+            key2.sport = key.dport;
+            key2.family = key.family;
+            key2.dst.ip4 = key.src.ip4;
+            key2.dport = key.sport;
+            bpf_map_update_elem(&sock_ops_map, &key2, socket, BPF_NOEXIST);
+
+            struct sock_key key3 = {};
+            key3.src.ip4 = peer->ip;
+            key3.sport = peer->port;
+            key3.family = key.family;
+            key3.dst.ip4 = key.dst.ip4;
+            key3.dport = key.dport;
+            bpf_map_update_elem(&sock_ops_map, &key3, skops->sk, BPF_NOEXIST);
+        }
+    }
 
     // insert the source socket in the sock_ops_map
     int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
