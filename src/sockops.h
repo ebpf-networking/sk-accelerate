@@ -121,4 +121,30 @@ struct {
     __array(values, struct endpoints_ports_inner_map);
 } endpoints_ports_map SEC(".maps");
 
+// Endpoints-to-Service is a hashmap. The key is <pod ip>:<pod port>, and the value is <service ip>:<service port>
+struct endpoints_to_service_key {
+    union {
+        __u32 ip4;
+        __u32 ip6[4];
+    } ip;
+    __u32 pad;
+    __u32 port;
+} __attribute__((packed));
+
+struct endpoints_to_service_value {
+    union {
+        __u32 ip4;
+        __u32 ip6[4];
+    } ip;
+    __u32 pad;
+    __u32 port;
+} __attribute__((packed));
+
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 1024);
+    __type(key, struct endpoints_to_service_key);
+    __type(value, struct endpoints_to_service_value);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+} endpoints_to_service_map SEC(".maps");
 
