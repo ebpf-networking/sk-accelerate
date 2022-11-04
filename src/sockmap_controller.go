@@ -24,14 +24,12 @@ import (
 )
 
 type map_key struct {
-    IP [16]byte
-    Pad uint32
+    IP [4]byte
     Port int32
 }
 
 type map_value struct {
-    IP [16]byte
-    Pad uint32
+    IP [4]byte
     Port int32
 }
 
@@ -157,15 +155,15 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
                 // TODO: TargetPort could be an name, for now we assume it is a number
                 podPort := int32(port.TargetPort.IntValue())
 
-                var podIPKey [16]byte
-                copy (podIPKey[:], podIP)
-                key := map_key{IP: podIPKey, Pad: 0, Port: podPort}
+                var podIPKey [4]byte
+                copy (podIPKey[:], podIP.To4())
+                key := map_key{IP: podIPKey, Port: podPort}
                 var value map_value;
                 err := m.Lookup(key, &value)
-                var serviceIPKey [16]byte
-                copy(serviceIPKey[:], serviceIP)
+                var serviceIPKey [4]byte
+                copy(serviceIPKey[:], serviceIP.To4())
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
-                    value := map_value{IP: serviceIPKey, Pad: 0, Port: servicePort}
+                    value := map_value{IP: serviceIPKey, Port: servicePort}
                     err = m.Put(key, value)
                     if (err != nil) {
                         panic(err.Error())
@@ -228,9 +226,9 @@ func deleteEndpointFromMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.
                 // TODO: TargetPort could be an name, for now we assume it is a number
                 podPort := int32(port.TargetPort.IntValue())
 
-                var podIPKey [16]byte
-                copy (podIPKey[:], podIP)
-                key := map_key{IP: podIPKey, Pad: 0, Port: podPort}
+                var podIPKey [4]byte
+                copy (podIPKey[:], podIP.To4())
+                key := map_key{IP: podIPKey, Port: podPort}
                 err := m.Delete(key)
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
                     fmt.Printf("(.) key doesn't exist and cannot be deleted: %s:%d\n", podIP, podPort)

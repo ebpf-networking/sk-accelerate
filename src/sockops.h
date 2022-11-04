@@ -123,20 +123,12 @@ struct {
 
 // Endpoints-to-Service is a hashmap. The key is <pod ip>:<pod port>, and the value is <service ip>:<service port>
 struct endpoints_to_service_key {
-    union {
-        __u32 ip4;
-        __u32 ip6[4];
-    } ip;
-    __u32 pad;
+    __u32 ip;
     __u32 port;
 } __attribute__((packed));
 
 struct endpoints_to_service_value {
-    union {
-        __u32 ip4;
-        __u32 ip6[4];
-    } ip;
-    __u32 pad;
+    __u32 ip;
     __u32 port;
 } __attribute__((packed));
 
