@@ -43,7 +43,7 @@ void sk_msg_extract6_key(struct sk_msg_md *msg,
 SEC("sk_msg")
 int bpf_tcpip_bypass(struct sk_msg_md *msg)
 {
-    struct  sock_key key = {};
+    struct sock_key key = {};
     if (msg->family == 2)
         sk_msg_extract4_key(msg, &key);
     else if (msg->family == 10) {
@@ -55,7 +55,13 @@ int bpf_tcpip_bypass(struct sk_msg_md *msg)
     else
         return SK_PASS;
 
-    bpf_msg_redirect_hash(msg, &sock_ops_map, &key, BPF_F_INGRESS);
+    struct sock_key *aux_key;
+
+    aux_key = bpf_map_lookup_elem(&sock_ops_aux_map, &key);
+    if (aux_key)
+        bpf_msg_redirect_hash(msg, &sock_ops_map, aux_key, BPF_F_INGRESS);
+    else
+        bpf_msg_redirect_hash(msg, &sock_ops_map, &key, BPF_F_INGRESS);
     return SK_PASS;
 }
 
