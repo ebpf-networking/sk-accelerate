@@ -140,3 +140,11 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } endpoints_to_service_map SEC(".maps");
 
+// Sock-Ops-Aux is a hashmap. The key and value are both sock_key
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 1024);
+    __type(key, struct sock_key);
+    __type(value, struct sock_key);
+    __uint(pinning, LIBBPF_PIN_BY_NAME);
+} sock_ops_aux_map SEC(".maps");
