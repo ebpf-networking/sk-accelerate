@@ -71,8 +71,8 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value2.src.ip4 = key.src.ip4;
         value2.sport = key.sport;
         value2.family = key.family;
-        value2.dst.ip4 = key.src.ip4;
-        value2.dport = key.sport;
+        value2.dst.ip4 = key.dst.ip4;
+        value2.dport = key.dport;
 
         bpf_map_update_elem(&sock_ops_aux_map, &key2, &value2, BPF_NOEXIST);
     }
