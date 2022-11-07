@@ -175,9 +175,9 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
                     kInt := ntohl(k)
                     binary.LittleEndian.PutUint32(serviceIPKey[:], kInt)
                     // Convert port to network order
-                    p := ntohl(servicePort) >> 16
+                    p := ntohl(uint32(servicePort)) >> 16
 
-                    value := map_value{IP: serviceIPKey, Port: p}
+                    value := map_value{IP: serviceIPKey, Port: int32(p)}
                     err = m.Put(key, value)
                     if (err != nil) {
                         panic(err.Error())
