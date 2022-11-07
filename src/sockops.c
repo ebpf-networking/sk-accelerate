@@ -87,6 +87,11 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
     if (ret != 0) {
         bpf_printk("FAILED: bpf_sock_hash_update ret: %d\n", ret);
     }
+
+    ret = bpf_sock_ops_cb_flags_set(skops, BPF_SOCK_OPS_STATE_CB_FLAG);
+    if (ret != 0) {
+        bpf_printk("FAILED: bpf_sock_ops_cb_flags_set() returned  %d\n", ret);
+    }
 }
 
 static inline
@@ -167,8 +172,14 @@ int bpf_sockops(struct bpf_sock_ops *skops)
             }
             break;
         case BPF_SOCK_OPS_STATE_CB:
-            bpf_printk("remote = %x:%d, local = %x:%d\n", skops->remote_ip4, skops->remote_port, skops->local_ip4, skops->local_port);
-            bpf_printk("args[1] = %x, args[2] = %x\n", skops->args[1], skops->args[2]);
+            switch(skops->args[1]) {
+                case BPF_TCP_CLOSE:
+                case BPF_TCP_CLOSE_WAIT:
+                case BPF_TCP_LAST_ACK:
+                    //bpf_printk("remote = %x:%d, local = %x:%d\n", skops->remote_ip4, skops->remote_port, skops->local_ip4, skops->local_port);
+                    bpf_printk("args[0] = %x, args[1] = %x\n", skops->args[0], skops->args[1]);
+                    break;
+            }
             break;
         default:
             bpf_printk("not supported op: %d\n", op);
