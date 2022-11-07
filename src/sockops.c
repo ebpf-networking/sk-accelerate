@@ -166,6 +166,10 @@ int bpf_sockops(struct bpf_sock_ops *skops)
                 }
             }
             break;
+        case BPF_SOCK_OPS_STATE_CB:
+            bpf_printk("remote = %x:%d, local = %x:%d\n", skops->remote_ip4, skops->remote_port, skops->local_ip4, skops->local_port);
+            bpf_printk("args[1] = %x, args[2] = %x\n", sockops->args[1], sockops->args[2]);
+            break;
         default:
             bpf_printk("not supported op: %d\n", op);
             break;
