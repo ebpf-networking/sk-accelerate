@@ -119,6 +119,12 @@ func htonl(i uint32) uint32 {
     return binary.BigEndian.Uint32(b)
 }
 
+func htons(i uint16) uint16 {
+    b := make([]byte, 2)
+    binary.LittleEndian.PutUint16(b, i)
+    return binary.BigEndian.Uint16(b)
+}
+
 func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
     fmt.Println("addEndpointToMap")
     service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
@@ -169,26 +175,20 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
                 podPort := int32(port.TargetPort.IntValue())
 
                 var podIPKey [4]byte
+                // Pod IP is already in network byte order
                 copy (podIPKey[:], podIP.To4())
-		// Convert pod IP to network order
-		j := binary.LittleEndian.Uint32(podIPKey[:])
-		jInt := htonl(j)
-		binary.BigEndian.PutUint32(podIPKey[:], jInt)
-		// Convert pod port to network order
-		q := htonl(uint32(podPort)) >> 16
+                // Convert pod port to network byte order
+                q := htons(uint16(podPort))
 
                 key := map_key{IP: podIPKey, Port: int32(q)}
                 var value map_value;
                 err := m.Lookup(key, &value)
                 var serviceIPKey [4]byte
+                // Service IP is already in network byte order
                 copy(serviceIPKey[:], serviceIP.To4())
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
-                    // Convert service IP to network order
-                    k := binary.LittleEndian.Uint32(serviceIPKey[:])
-                    kInt := htonl(k)
-                    binary.BigEndian.PutUint32(serviceIPKey[:], kInt)
                     // Convert service port to network order
-                    p := htonl(uint32(servicePort)) >> 16
+                    p := htons(uint16(servicePort))
 
                     value := map_value{IP: serviceIPKey, Port: int32(p)}
                     err = m.Put(key, value)
