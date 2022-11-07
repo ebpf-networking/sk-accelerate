@@ -113,6 +113,12 @@ func ntohl(i uint32) uint32 {
     return binary.LittleEndian.Uint32(b)
 }
 
+func htonl(i uint32) uint32 {
+    b := make([]byte, 4)
+    binary.LittleEndian.PutUint32(b, i)
+    return binary.BigEndian.Uint32(b)
+}
+
 func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
     fmt.Println("addEndpointToMap")
     service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
@@ -151,7 +157,7 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
 
         for _, address := range addresses {
             podIP := net.ParseIP(address.IP)
-            
+
             for _, port := range servicePorts {
                 // We only handle TCP and TCP is default if the Protocol field is not specified
                 if (port.Protocol != "" && port.Protocol != "TCP") {
@@ -164,18 +170,25 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
 
                 var podIPKey [4]byte
                 copy (podIPKey[:], podIP.To4())
-                key := map_key{IP: podIPKey, Port: podPort}
+		// Convert pod IP to network order
+		j := binary.LittleEndian.Uint32(podIPKey[:])
+		jInt := htonl(j)
+		binary.BigEndian.PutUint32(podIPKey[:], jInt)
+		// Convert pod port to network order
+		q := htonl(uint32(podPort)) >> 16
+
+                key := map_key{IP: podIPKey, Port: int32(q)}
                 var value map_value;
                 err := m.Lookup(key, &value)
                 var serviceIPKey [4]byte
                 copy(serviceIPKey[:], serviceIP.To4())
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
-                    // Convert IP address to network order
-                    k := binary.BigEndian.Uint32(serviceIPKey[:])
-                    kInt := ntohl(k)
-                    binary.LittleEndian.PutUint32(serviceIPKey[:], kInt)
-                    // Convert port to network order
-                    p := ntohl(uint32(servicePort)) >> 16
+                    // Convert service IP to network order
+                    k := binary.LittleEndian.Uint32(serviceIPKey[:])
+                    kInt := htonl(k)
+                    binary.BigEndian.PutUint32(serviceIPKey[:], kInt)
+                    // Convert service port to network order
+                    p := htonl(uint32(servicePort)) >> 16
 
                     value := map_value{IP: serviceIPKey, Port: int32(p)}
                     err = m.Put(key, value)
