@@ -7,6 +7,7 @@ import (
     "path/filepath"
     "net"
     "errors"
+    "encoding/binary"
 
     "k8s.io/api/core/v1"
     "k8s.io/apimachinery/pkg/util/wait"
@@ -106,6 +107,12 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
     }
 }
 
+func ntohl(i uint32) uint32 {
+    b := make([]byte, 4)
+    binary.BigEndian.PutUint32(b, i)
+    return binary.LittleEndian.Uint32(b)
+}
+
 func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
     fmt.Println("addEndpointToMap")
     service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
@@ -163,7 +170,14 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
                 var serviceIPKey [4]byte
                 copy(serviceIPKey[:], serviceIP.To4())
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
-                    value := map_value{IP: serviceIPKey, Port: servicePort}
+                    // Convert IP address to network order
+                    k := binary.BigEndian.Uint32(serviceIPKey[:])
+                    kInt := ntohl(k)
+                    binary.LittleEndian.PutUint32(serviceIPKey[:], kInt)
+                    // Convert port to network order
+                    p := ntohl(servicePort) >> 16
+
+                    value := map_value{IP: serviceIPKey, Port: p}
                     err = m.Put(key, value)
                     if (err != nil) {
                         panic(err.Error())

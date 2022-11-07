@@ -25,7 +25,7 @@ void sk_extractv4_key(struct bpf_sock_ops *ops,
 // Returns service ip/port if the source ip/port is an endpoint
 static inline
 struct endpoints_to_service_value* is_endpoint(struct sock_key *key) {
-    struct endpoints_to_service_key map_key;
+    struct endpoints_to_service_key map_key = {};
     map_key.ip = key->src.ip4;
     map_key.port = key->sport;
     return bpf_map_lookup_elem(&endpoints_to_service_map, &map_key);
@@ -41,6 +41,7 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
 
     service = is_endpoint(&key);
     if (service) {
+        bpf_printk("is_endpoint() returned non null\n");
         struct sock_key key1 = {};
         struct sock_key value1 = {};
 
@@ -74,6 +75,9 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value2.dport = key.sport;
 
         bpf_map_update_elem(&sock_ops_aux_map, &key2, &value2, BPF_NOEXIST);
+    }
+    else {
+        bpf_printk("is_endpoint() returned null\n");
     }
 
     // insert the source socket in the sock_ops_map

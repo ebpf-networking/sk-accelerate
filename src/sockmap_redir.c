@@ -58,10 +58,12 @@ int bpf_tcpip_bypass(struct sk_msg_md *msg)
     struct sock_key *aux_key;
 
     aux_key = bpf_map_lookup_elem(&sock_ops_aux_map, &key);
-    if (aux_key)
+    if (aux_key) {
         bpf_msg_redirect_hash(msg, &sock_ops_map, aux_key, BPF_F_INGRESS);
-    else
+    }
+    else {
         bpf_msg_redirect_hash(msg, &sock_ops_map, &key, BPF_F_INGRESS);
+    }
     return SK_PASS;
 }
 
