@@ -252,10 +252,12 @@ func deleteEndpointFromMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.
 
                 // TODO: TargetPort could be an name, for now we assume it is a number
                 podPort := int32(port.TargetPort.IntValue())
+                // Convert pod port to network order
+                p := htons(uint16(podPort))
 
                 var podIPKey [4]byte
                 copy (podIPKey[:], podIP.To4())
-                key := map_key{IP: podIPKey, Port: podPort}
+                key := map_key{IP: podIPKey, Port: int32(p)}
                 err := m.Delete(key)
                 if errors.Is(err, ebpf.ErrKeyNotExist) {
                     fmt.Printf("(.) key doesn't exist and cannot be deleted: %s:%d\n", podIP, podPort)
