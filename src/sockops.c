@@ -41,7 +41,6 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
 
     service = is_endpoint(&key);
     if (service) {
-        bpf_printk("is_endpoint() returned non null\n");
         struct sock_key key1 = {};
         struct sock_key value1 = {};
 
@@ -76,9 +75,6 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
 
         bpf_map_update_elem(&sock_ops_aux_map, &key2, &value2, BPF_NOEXIST);
     }
-    else {
-        bpf_printk("is_endpoint() returned null\n");
-    }
 
     // insert the source socket in the sock_ops_map
     int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
@@ -88,9 +84,42 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         bpf_printk("FAILED: bpf_sock_hash_update ret: %d\n", ret);
     }
 
+    // set the callback flag when tcp state changes
     ret = bpf_sock_ops_cb_flags_set(skops, BPF_SOCK_OPS_STATE_CB_FLAG);
     if (ret != 0) {
         bpf_printk("FAILED: bpf_sock_ops_cb_flags_set() returned  %d\n", ret);
+    }
+}
+
+static inline 
+void bpf_sock_ops_ipv4_cleanup(struct bpf_sock_ops *skops)
+{
+    struct sock_key key = {};
+    struct endpoints_to_service_value *service;
+
+    sk_extractv4_key(skops, &key);
+
+    service = is_endpoint(&key);
+    if (service) {
+        struct sock_key key1 = {};
+
+        key1.src.ip4 = key.dst.ip4;
+        key1.sport = key.dport;
+        key1.family = key.family;
+        key1.dst.ip4 = key.src.ip4;
+        key1.dport = key.sport;
+
+        bpf_map_delete_elem(&sock_ops_aux_map, &key1);
+
+        struct sock_key key2 = {};
+
+        key2.src.ip4 = service->ip;
+        key2.sport = service->port;
+        key2.family = key.family;
+        key2.dst.ip4 = key.dst.ip4;
+        key2.dport = key.dport;
+
+        bpf_map_delete_elem(&sock_ops_aux_map, &key2);
     }
 }
 
@@ -176,8 +205,14 @@ int bpf_sockops(struct bpf_sock_ops *skops)
                 case BPF_TCP_CLOSE:
                 case BPF_TCP_CLOSE_WAIT:
                 case BPF_TCP_LAST_ACK:
-                    //bpf_printk("remote = %x:%d, local = %x:%d\n", skops->remote_ip4, skops->remote_port, skops->local_ip4, skops->local_port);
-                    bpf_printk("args[0] = %x, args[1] = %x\n", skops->args[0], skops->args[1]);
+                    if (family == 2) {
+                        bpf_sock_ops_ipv4_cleanup(skops);
+                    }
+                    else {
+                        bpf_printk("ipv6 for service ip not supported\n");
+                    }
+                    break;
+                default:
                     break;
             }
             break;
