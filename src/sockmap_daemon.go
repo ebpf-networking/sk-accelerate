@@ -121,7 +121,15 @@ func main() {
     if (err == nil) {
         fmt.Printf("Cgroup2 mount point: %s\n", mount)
     } else {
-        log.Fatal(err)
+        fmt.Printf("Trying to mount cgroup2...")
+
+        cmd := exec.Command("/bin/mount", "-t", "cgroup2", "none", "/sys/fs/cgroup")
+        err := cmd.Run()
+        if err != nil {
+            log.Fatal(err)
+        }
+        mount = "/sys/fs/cgroup"
+        fmt.Printf("Done\n")
     }
 
     fmt.Print("Copying files...")
@@ -142,7 +150,7 @@ func main() {
     fmt.Println("Done")
 
     fmt.Print("Attaching sockops program...")
-    cmd = exec.Command("/opt/sockmap/bpftool", "cgroup", "attach", "/sys/fs/cgroup/unified", "sock_ops", "pinned", "/sys/fs/bpf/sockop")
+    cmd = exec.Command("/opt/sockmap/bpftool", "cgroup", "attach", mount, "sock_ops", "pinned", "/sys/fs/bpf/sockop")
     err = cmd.Run()
     if err != nil {
         log.Fatal(err)
