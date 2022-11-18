@@ -123,12 +123,14 @@ func main() {
     } else {
         fmt.Printf("Trying to mount cgroup2...")
 
-        cmd := exec.Command("/bin/mount", "-t", "cgroup2", "none", "/sys/fs/cgroup")
+        os.MkdirAll("/var/run/sk-accelerate/cgroupv2", os.ModePerm)
+
+        cmd := exec.Command("/bin/mount", "-t", "cgroup2", "none", "/var/run/sk-accelerate/cgroupv2")
         err := cmd.Run()
         if err != nil {
             log.Fatal(err)
         }
-        mount = "/sys/fs/cgroup"
+        mount = "/var/run/sk-accelerate/cgroupv2"
         fmt.Printf("Done\n")
     }
 
