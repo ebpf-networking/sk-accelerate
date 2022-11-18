@@ -6,9 +6,9 @@
 # - perf
 # - perl
 
-git clone https://github.com/brendangregg/FlameGraph.git
+#git clone https://github.com/brendangregg/FlameGraph.git
 
-iperf3_runtime=10
+iperf3_runtime=60
 wait_time=$((iperf3_runtime+10))
 buffer_len=128k
 
@@ -123,27 +123,27 @@ kubectl wait --for=condition=Ready pod/${client_pod}
 server_containerid=$(container_of pod1)
 client_containerid=$(container_of ${client_pod})
 
-server_alt_uid=$(echo -n $server_uid|tr '-' '_')
-client_alt_uid=$(echo -n $client_uid|tr '-' '_')
-perf record -g -a -o server-perf.data -e cycles -G kubepods-besteffort-pod${server_alt_uid}.slice:cri-containerd:${server_containerid} sleep $iperf3_runtime &
-perf record -g -a -o client-perf.data -e cycles -G kubepods-besteffort-pod${client_alt_uid}.slice:cri-containerd:${client_containerid} sleep $iperf3_runtime &
+#server_alt_uid=$(echo -n $server_uid|tr '-' '_')
+#client_alt_uid=$(echo -n $client_uid|tr '-' '_')
+#perf record -g -a -o server-perf.data -e cycles -G kubepods-besteffort-pod${server_alt_uid}.slice:cri-containerd:${server_containerid} sleep $iperf3_runtime &
+#perf record -g -a -o client-perf.data -e cycles -G kubepods-besteffort-pod${client_alt_uid}.slice:cri-containerd:${client_containerid} sleep $iperf3_runtime &
 
-rm -f ${output_dir}/.server_cpu.txt
-rm -f ${output_dir}/.client_cpu.txt
-cpu_of $server_alt_uid $server_containerid "server" &
-cpu_of $client_alt_uid $client_containerid "client" &
+#rm -f ${output_dir}/.server_cpu.txt
+#rm -f ${output_dir}/.client_cpu.txt
+#cpu_of $server_alt_uid $server_containerid "server" &
+#cpu_of $client_alt_uid $client_containerid "client" &
 
 sleep $wait_time
 kubectl logs pod1 >${output_dir}/server.log
 kubectl logs ${client_pod} >${output_dir}/client.log
-perf script -i server-perf.data | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl >${output_dir}/server-flamegraph.svg
-perf script -i client-perf.data | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl >${output_dir}/client-flamegraph.svg
+#perf script -i server-perf.data | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl >${output_dir}/server-flamegraph.svg
+#perf script -i client-perf.data | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl >${output_dir}/client-flamegraph.svg
 
-cat ${output_dir}/.server_cpu.txt | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d' > ${output_dir}/server_cpu.txt
-cat ${output_dir}/.client_cpu.txt | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d' > ${output_dir}/client_cpu.txt
+#cat ${output_dir}/.server_cpu.txt | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d' > ${output_dir}/server_cpu.txt
+#cat ${output_dir}/.client_cpu.txt | sed -e 'H;${x;s/\n/,/g;s/^,//;p;};d' > ${output_dir}/client_cpu.txt
 
-rm -f server-perf.data
-rm -f client-perf.data
+#rm -f server-perf.data
+#rm -f client-perf.data
 kubectl delete pod pod1
 kubectl delete svc pod1
 kubectl delete job iperf3-client
