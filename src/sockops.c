@@ -41,8 +41,8 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
 
     // insert the source socket in the sock_ops_map
     int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
-    bpf_printk("<<< ipv4 op = %d, port %d --> %d\n",
-        skops->op, skops->local_port, bpf_ntohl(skops->remote_port));
+    //bpf_printk("<<< ipv4 op = %d, port %d --> %d\n",
+        //skops->op, skops->local_port, bpf_ntohl(skops->remote_port));
     if (ret != 0) {
         bpf_printk("FAILED: bpf_sock_hash_update ret: %d\n", ret);
     }
