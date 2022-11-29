@@ -67,6 +67,8 @@ spec:
           mountPath: /opt
         - name: sys
           mountPath: /sys
+        - name: sk-run
+          mountPath: /var/run/sk-accelerate
       volumes:
       - name: opt
         hostPath:
@@ -74,3 +76,7 @@ spec:
       - name: sys
         hostPath:
           path: /sys
+      - name: sk-run
+        hostPath:
+          path: /var/run/sk-accelerate
+          type: DirectoryOrCreate

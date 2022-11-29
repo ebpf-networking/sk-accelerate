@@ -2,21 +2,18 @@
 
 ## Prereq
 
-```
-git clone git@github.com:ebpf-networking/sk-accelerate.git
-cd sk-acclerate
-```
+Need Linux kernel version >= 4.18
 
 ## Install
 
 ```
-kubectl apply -f sockmap.yml
+kubectl apply -f https://raw.githubusercontent.com/ebpf-networking/sk-accelerate/main/sockmap.yml
 ```
 
 ## Uninstall
 
 ```
-kubectl delete -f sockmap.yml
+kubectl delete -f https://raw.githubusercontent.com/ebpf-networking/sk-accelerate/main/sockmap.yml
 ```
 
 # How it works
