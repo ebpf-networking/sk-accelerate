@@ -279,7 +279,7 @@ func printEndpoints(endpoints map[string]*v1.Endpoints) {
     }
 }
 
-func main() {
+func StartController() {
     rlimit.RemoveMemlock()
     var kubeconfig *string
     if home := homedir.HomeDir(); home != "" {
