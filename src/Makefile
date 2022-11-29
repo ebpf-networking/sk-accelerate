@@ -38,7 +38,7 @@ $(IPROUTE2_TC): $(wildcard $(IPROUTE2_SRC/*/*[ch]) (LIBBPF_SRC)/Makefile) | $(di
 	(cd $(IPROUTE2_SRC); pwd; ls -al; ./configure; git apply ../misc/iproute2.diff; make)
 	mv $(IPROUTE2_SRC)/tc/tc $@
 
-$(OUTPUT)/sockops.o: sockops.c $(LIBBPF_OBJECT) $(IPROUTE2_TC) | $(OUTPUT)
+$(OUTPUT)/sockops.o: sockops.c sockops.h $(LIBBPF_OBJECT) $(IPROUTE2_TC) | $(OUTPUT)
 	$(CLANG) \
 	    -g -O2 \
 	    -target bpf \
@@ -52,7 +52,7 @@ $(OUTPUT)/sockops.o: sockops.c $(LIBBPF_OBJECT) $(IPROUTE2_TC) | $(OUTPUT)
 	    -c $< -o $@
 	$(LLVM_STRIP) -g $@
 
-$(OUTPUT)/sockmap_redir.o: sockmap_redir.c $(LIBBPF_OBJECT) $(IPROUTE2_TC) | $(OUTPUT)
+$(OUTPUT)/sockmap_redir.o: sockmap_redir.c sockops.h $(LIBBPF_OBJECT) $(IPROUTE2_TC) | $(OUTPUT)
 	$(CLANG) \
 	    -g -O2 \
 	    -target bpf \

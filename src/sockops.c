@@ -5,14 +5,6 @@
 #include "sockops.h"
 
 /*
- * test if socket pairs are local
- */
-static inline
-int sk_is_local(struct sock_key *key) {
-    return 1;
-}
-
-/*
  * extract the key identifying the socket source of the TCP event
  */
 static inline
@@ -30,21 +22,173 @@ void sk_extractv4_key(struct bpf_sock_ops *ops,
     key->dport = READ_ONCE(ops->remote_port) >> 16;
 }
 
+// Returns service ip/port if the source ip/port is an endpoint
+static inline
+struct endpoints_to_service_value* is_endpoint(struct sock_key *key) {
+    struct endpoints_to_service_key map_key = {};
+    map_key.ip = key->src.ip4;
+    map_key.port = key->sport;
+    return bpf_map_lookup_elem(&endpoints_to_service_map, &map_key);
+}
+
 static inline
 void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
 {
     struct sock_key key = {};
+    struct endpoints_to_service_value *service;
 
     sk_extractv4_key(skops, &key);
-    if (!sk_is_local(&key))
-        return;
+
+    service = is_endpoint(&key);
+    if (service) {
+        struct sock_key key1 = {};
+        struct sock_key value1 = {};
+
+        key1.src.ip4 = key.dst.ip4;
+        key1.sport = key.dport;
+        key1.family = key.family;
+        key1.dst.ip4 = key.src.ip4;
+        key1.dport = key.sport;
+
+        value1.src.ip4 = key.dst.ip4;
+        value1.sport = key.dport;
+        value1.family = key.family;
+        value1.dst.ip4 = service->ip;
+        value1.dport = service->port;
+
+        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
+        //bpf_printk("1: ipv4 op = %d, src %x:%d =>\n",
+            //skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
+        //bpf_printk("dst %x:%d\n",
+            //key1.dst.ip4, bpf_ntohl(key1.dport << 16));
+
+        key1.src.ip4 = service->ip;
+        key1.sport = service->port;
+        key1.family = key.family;
+        key1.dst.ip4 = key.dst.ip4;
+        key1.dport = key.dport;
+
+        value1.src.ip4 = key.src.ip4;
+        value1.sport = key.sport;
+        value1.family = key.family;
+        value1.dst.ip4 = key.dst.ip4;
+        value1.dport = key.dport;
+
+        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
+        //bpf_printk("2: ipv4 op = %d, src %x:%d =>\n",
+            //skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
+        //bpf_printk("dst %x:%d\n",
+            //key1.dst.ip4, bpf_ntohl(key1.dport << 16));
+    
+        key1.src.ip4 = key.dst.ip4;
+        key1.sport = key.dport;
+        key1.family = 0;
+        key1.dst.ip4 = 0;
+        key1.dport = 0;
+
+        value1.src.ip4 = key.src.ip4;
+        value1.sport = key.sport;
+        value1.family = 0;
+        value1.dst.ip4 = 0;
+        value1.dport = 0;
+
+        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
+    }
 
     // insert the source socket in the sock_ops_map
     int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
-    //bpf_printk("<<< ipv4 op = %d, port %d --> %d\n",
-        //skops->op, skops->local_port, bpf_ntohl(skops->remote_port));
+    bpf_printk("<<< ipv4 op = %d, src %x:%d =>\n",
+        skops->op, skops->local_ip4, skops->local_port);
+    bpf_printk("dst %x:%d\n",
+        skops->remote_ip4, bpf_ntohl(skops->remote_port));
     if (ret != 0) {
         bpf_printk("FAILED: bpf_sock_hash_update ret: %d\n", ret);
+    }
+
+    // set the callback flag when tcp state changes
+    ret = bpf_sock_ops_cb_flags_set(skops, BPF_SOCK_OPS_STATE_CB_FLAG);
+    if (ret != 0) {
+        bpf_printk("FAILED: bpf_sock_ops_cb_flags_set() returned  %d\n", ret);
+    }
+}
+
+static inline 
+void bpf_sock_ops_ipv4_cleanup(struct bpf_sock_ops *skops)
+{
+    struct sock_key key = {};
+    struct sock_key *value;
+
+    bpf_printk(">>> ipv4 op = %d, src %x:%d =>\n",
+        skops->op, skops->local_ip4, skops->local_port);
+    bpf_printk("dst %x:%d\n",
+        skops->remote_ip4, bpf_ntohl(skops->remote_port));
+
+    sk_extractv4_key(skops, &key);
+
+    //bpf_printk("3: ipv4 op = %d, src %x:%d =>\n",
+        //skops->op, key.src.ip4, bpf_ntohl(key.sport << 16));
+    //bpf_printk("dst %x:%d\n",
+        //key.dst.ip4, bpf_ntohl(key.dport << 16));
+
+    value = bpf_map_lookup_elem(&sock_ops_aux_map, &key);
+    if (value == 0) {
+
+        struct sock_key key1 = {};
+        struct sock_key *value1;
+        key1.src.ip4 = key.src.ip4;
+        key1.sport = key.sport;
+        key1.family = 0;
+        key1.dst.ip4 = 0;
+        key1.dport = 0;
+
+        value1 = bpf_map_lookup_elem(&sock_ops_aux_map, &key1);
+        if (value1) {
+            struct sock_key key2 = {};
+            key2.src.ip4 = key.src.ip4;
+            key2.sport = key.sport;
+            key2.family = key.family;
+            key2.dst.ip4 = value1->src.ip4;
+            key2.dport = value1->sport;
+
+            bpf_map_delete_elem(&sock_ops_aux_map, &key2);
+
+            struct sock_key key3 ={};
+            key3.src.ip4 = key.dst.ip4;
+            key3.sport = key.dport;
+            key3.family = key.family;
+            key3.dst.ip4 = key.src.ip4;
+            key3.dport = key.sport;
+
+            bpf_map_delete_elem(&sock_ops_aux_map, &key3);
+            bpf_map_delete_elem(&sock_ops_aux_map, &key1);
+        }
+        else {
+            // connection termination does not involve an endpoint pod
+        }
+    }
+    else {
+        // an endpoint pod is accessed directly not via its service IP
+        struct sock_key key1 = {};
+
+        // make a copy of the value before it is deleted from the map
+        key1.src.ip4 = value->dst.ip4;
+        key1.sport = value->dport;
+        key1.family = value->family;
+        key1.dst.ip4 = value->src.ip4;
+        key1.dport = value->sport;
+
+        bpf_map_delete_elem(&sock_ops_aux_map, &key);
+        bpf_map_delete_elem(&sock_ops_aux_map, &key1);
+
+        struct sock_key key2 = {};
+
+        key2.src.ip4 = key.src.ip4;
+        key2.sport = key.sport;
+        key2.family = 0;
+        key2.dst.ip4 = 0;
+        key2.dport = 0;
+
+        bpf_map_delete_elem(&sock_ops_aux_map, &key2);
     }
 }
 
@@ -79,8 +223,6 @@ void bpf_sock_ops_ipv6(struct bpf_sock_ops *skops)
     struct sock_key key = {};
 
     sk_extractv6_key(skops, &key);
-    if (!sk_is_local(&key))
-        return;
 
     // insert the source socket in the sock_ops_map
     int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
@@ -125,6 +267,22 @@ int bpf_sockops(struct bpf_sock_ops *skops)
                             */
                     bpf_sock_ops_ipv6(skops);
                 }
+            }
+            break;
+        case BPF_SOCK_OPS_STATE_CB:
+            switch(skops->args[1]) {
+                case BPF_TCP_CLOSE:
+                case BPF_TCP_CLOSE_WAIT:
+                case BPF_TCP_LAST_ACK:
+                    if (family == 2) {
+                        bpf_sock_ops_ipv4_cleanup(skops);
+                    }
+                    else {
+                        //bpf_printk("ipv6 for service ip not supported\n");
+                    }
+                    break;
+                default:
+                    break;
             }
             break;
         default:

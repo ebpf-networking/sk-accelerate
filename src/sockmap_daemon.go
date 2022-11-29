@@ -183,6 +183,8 @@ func main() {
         os.Exit(0)
     }()
 
+    StartController()
+
     // TODO: need an API server to load/unload the sockmap program
     for {
         time.Sleep(time.Duration(1<<63 - 1))

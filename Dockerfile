@@ -26,9 +26,10 @@ ldd bpftool 2>&1 | grep -q -e "Not a valid dynamic program" \
 
 FROM golang:alpine as gobuilder
 COPY ./src/sockmap_daemon.go $GOPATH/src
+COPY ./src/sockmap_controller.go $GOPATH/src
 RUN cd $GOPATH/src && go mod init sockmap && ls -al /go/src
 RUN cd $GOPATH/src && go get github.com/moby/sys/mountinfo
-RUN cd $GOPATH/src && go build -o /sockmap_daemon
+RUN cd $GOPATH/src && go build -o /sockmap_daemon *.go
 
 FROM frolvlad/alpine-glibc:alpine-3.14_glibc-2.33
 RUN apk add libelf
