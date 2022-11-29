@@ -4,14 +4,11 @@ metadata:
   name: sockmap
 rules:
 - apiGroups: [""]
-  resources: ["pods"]
+  resources: ["endpoints"]
   verbs: ["get", "watch", "list"]
 - apiGroups: [""]
-  resources: ["nodes"]
+  resources: ["services"]
   verbs: ["get", "watch", "list"]
-- apiGroups: [""]
-  resources: ["nodes/status"]
-  verbs: ["patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

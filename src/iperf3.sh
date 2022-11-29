@@ -8,9 +8,9 @@
 
 #git clone https://github.com/brendangregg/FlameGraph.git
 
-iperf3_runtime=60
+iperf3_runtime=10
 wait_time=$((iperf3_runtime+10))
-buffer_len=128k
+buffer_len=512k
 
 function run_server()
 {
@@ -134,8 +134,9 @@ client_containerid=$(container_of ${client_pod})
 #cpu_of $client_alt_uid $client_containerid "client" &
 
 sleep $wait_time
-kubectl logs pod1 >${output_dir}/server.log
-kubectl logs ${client_pod} >${output_dir}/client.log
+#kubectl logs pod1 >${output_dir}/server.log
+#kubectl logs ${client_pod} >${output_dir}/client.log
+kubectl logs ${client_pod}
 #perf script -i server-perf.data | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl >${output_dir}/server-flamegraph.svg
 #perf script -i client-perf.data | ./FlameGraph/stackcollapse-perf.pl | ./FlameGraph/flamegraph.pl >${output_dir}/client-flamegraph.svg
 
