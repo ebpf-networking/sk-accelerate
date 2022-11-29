@@ -40,6 +40,7 @@ struct {
 } sock_ops_map SEC(".maps") ;
 
 // Hash key to the services_map. Supports both ipv4 and ipv6
+/*
 struct service_key {
     union {
         __u32 ip4;
@@ -59,10 +60,12 @@ struct {
     __type(value, struct service_value);    // service namespace + name
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } services_map SEC(".maps");
+*/
 
 // Endpoints IPs are kept in a map of hash maps. The key to the outer map is the 
 // namespace+name pair. The key to the inner maps are the pod IPs, and the 
 // value is a static number 0.
+/*
 struct endpoints_ips_outer_key {
     char namespace[128];
     char name[128];
@@ -91,10 +94,12 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
     __array(values, struct endpoints_ips_inner_map);
 } endpoints_ips_map SEC(".maps");
+*/
 
 // Endpoints Ports are kept in a map of hash maps. The key to the outer map is the 
 // namespace+name pair. The key to the inner maps are the ports, and the 
 // value is a static number 0.
+/*
 struct endpoints_ports_outer_key {
     char namespace[128];
     char name[128];
@@ -120,8 +125,10 @@ struct {
     __uint(pinning, LIBBPF_PIN_BY_NAME);
     __array(values, struct endpoints_ports_inner_map);
 } endpoints_ports_map SEC(".maps");
+*/
 
 // Endpoints-to-Service is a hashmap. The key is <pod ip>:<pod port>, and the value is <service ip>:<service port>
+// As the name suggests, it creates a map entry for each endpoint pod ip:port to service ip:port pair
 struct endpoints_to_service_key {
     __u32 ip;
     __u32 port;
@@ -148,3 +155,42 @@ struct {
     __type(value, struct sock_key);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
 } sock_ops_aux_map SEC(".maps");
+
+// Here is an example of how endpoints_to_service_map and sock_ops_aux_map are used to support service IPs
+// pod 1 IP: 1
+// pod 2 IP: 2
+// service IP to pod 2: 9
+//
+// When pod 1 makes a tcp connection to pod 2 via its service IP, the following entries are added to sock_ops_map:
+//
+// -----------------
+// | key   | value |
+// -----------------
+// | 1->9  |  sk1  |
+// | 2->1  |  sk2  |
+// -----------------
+//
+// Without any additional ebpf maps, we cannot accelerate the tcp connection betwee pod 1 and pod 2 since the lookup of
+// the keys '9->1' and '1->2' will fail. This is where the other ebpf maps come in. A K8s custom controller is created
+// to monitor for endpoints, and it will put the following entries in endpoints_to_service_map:
+//
+// -----------------
+// | key   | value |
+// -----------------
+// |  2    |   9   |
+// -----------------
+//
+// At the tcp connection time, when the source ip/port matches an entry in the above map, it is possible that the connection
+// was made through a service IP, e.g., when '2->1' connection is made, we will see that '2' is in the endpoints_to_service_map.
+// At this time, we will create a few additional entries in the sock_ops_aux_map as follows:
+//
+// -----------------
+// | key   | value |
+// -----------------
+// | 1->2  | 1->9  |
+// | 9->1  | 2->1  |
+// -----------------
+//
+// The map complements the sock_ops_map, so during sendmsg phase, we first check in this map before checking the sock_ops_map.
+// The previously failing lookups of '9->1' and '1->2' can now be found in this map, and we will use the correponding values
+// of these entries (i.e., '1->9' and '2->1') to do further lookup in sock_ops_map, which will now succeed.
