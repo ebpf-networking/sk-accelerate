@@ -51,14 +51,14 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
     endpointInformer := informerFactory.Core().V1().Endpoints()
     endpointInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
         AddFunc: func(new interface{}) {
-            fmt.Println("Addfunc")
+            //fmt.Println("Addfunc")
             endpoint := new.(*v1.Endpoints)
             namespace := endpoint.ObjectMeta.Namespace
             name := endpoint.ObjectMeta.Name
             key := namespace + ":" + name
             if _, ok := endpoints[key]; ok {
                 // This endpoint already exists
-                fmt.Printf("Adding an endpoint %s that already exists\n", key)
+                //fmt.Printf("Adding an endpoint %s that already exists\n", key)
                 return
             }
             endpoints[key] = endpoint
@@ -66,12 +66,12 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             addEndpointToMap(endpoint, serviceInformer)
         },
         UpdateFunc: func(old, new interface{}) {
-            fmt.Println("Updatefunc")
+            //fmt.Println("Updatefunc")
             o := old.(*v1.Endpoints)
             n := new.(*v1.Endpoints)
             if (len(o.Subsets) != len(n.Subsets)) {
-                fmt.Printf("old: %s\n", o)
-                fmt.Printf("new: %s\n", n)
+                //fmt.Printf("old: %s\n", o)
+                //fmt.Printf("new: %s\n", n)
                 key := o.ObjectMeta.Namespace + ":" + o.ObjectMeta.Name
                 endpoints[key] = n
                 deleteEndpointFromMap(o, serviceInformer)
@@ -79,7 +79,7 @@ func monitorEndpoints(informerFactory informers.SharedInformerFactory, endpoints
             }
         },
         DeleteFunc: func(obj interface{}) {
-            fmt.Println("Deletefunc")
+            //fmt.Println("Deletefunc")
             // This is not very useful as endpoint.Subsets is empty at this point
             endpoint := obj.(*v1.Endpoints)
             namespace := endpoint.ObjectMeta.Namespace
@@ -126,7 +126,7 @@ func htons(i uint16) uint16 {
 }
 
 func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
-    fmt.Println("addEndpointToMap")
+    //fmt.Println("addEndpointToMap")
     service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
     if (err != nil) {
         return
@@ -206,7 +206,7 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
 }
 
 func deleteEndpointFromMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.ServiceInformer) {
-    fmt.Println("deleteEndpointFromMap")
+    //fmt.Println("deleteEndpointFromMap")
     service, err := serviceInformer.Lister().Services(endpoint.ObjectMeta.Namespace).Get(endpoint.ObjectMeta.Name)
     if (err != nil) {
         return
