@@ -57,6 +57,16 @@ func cleanup() {
     if err != nil {
         log.Fatal(err)
     }
+    cmd = exec.Command("/bin/rm", "-f", "/sys/fs/bpf/endpoints_to_service_map")
+    err = cmd.Run()
+    if err != nil {
+        log.Fatal(err)
+    }
+    cmd = exec.Command("/bin/rm", "-f", "/sys/fs/bpf/sock_ops_aux_map")
+    err = cmd.Run()
+    if err != nil {
+        log.Fatal(err)
+    }
     fmt.Println("Done")
 
 }
