@@ -56,7 +56,7 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value1.dst.ip4 = service->ip;
         value1.dport = service->port;
 
-        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
+        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_ANY);
         bpf_printk("1: ipv4 op = %d, src %x:%d =>\n",
             skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
         bpf_printk("dst %x:%d\n",
@@ -74,7 +74,7 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value1.dst.ip4 = key.dst.ip4;
         value1.dport = key.dport;
 
-        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
+        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_ANY);
         bpf_printk("2: ipv4 op = %d, src %x:%d =>\n",
             skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
         bpf_printk("dst %x:%d\n",
@@ -92,11 +92,15 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value1.dst.ip4 = 0;
         value1.dport = 0;
 
-        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
+        bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_ANY);
+        bpf_printk("3: ipv4 op = %d, src %x:%d =>\n",
+            skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
+        bpf_printk("dst %x:%d\n",
+            key1.dst.ip4, bpf_ntohl(key1.dport << 16));
     }
 
     // insert the source socket in the sock_ops_map
-    int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
+    int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_ANY);
     bpf_printk("<<< ipv4 op = %d, src %x:%d =>\n",
         skops->op, skops->local_ip4, skops->local_port);
     bpf_printk("dst %x:%d\n",
@@ -225,7 +229,7 @@ void bpf_sock_ops_ipv6(struct bpf_sock_ops *skops)
     sk_extractv6_key(skops, &key);
 
     // insert the source socket in the sock_ops_map
-    int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_NOEXIST);
+    int ret = bpf_sock_hash_update(skops, &sock_ops_map, &key, BPF_ANY);
     //bpf_printk("<<< ipv6 op = %d, port %d --> %d\n",
         //skops->op, skops->local_port, bpf_ntohl(skops->remote_port));
     if (ret != 0) {
