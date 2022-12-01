@@ -141,7 +141,7 @@ struct endpoints_to_service_value {
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1024);
+    __uint(max_entries, 65535);
     __type(key, struct endpoints_to_service_key);
     __type(value, struct endpoints_to_service_value);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
@@ -150,7 +150,7 @@ struct {
 // Sock-Ops-Aux is a hashmap. The key and value are both sock_key
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1024);
+    __uint(max_entries, 65535);
     __type(key, struct sock_key);
     __type(value, struct sock_key);
     __uint(pinning, LIBBPF_PIN_BY_NAME);
