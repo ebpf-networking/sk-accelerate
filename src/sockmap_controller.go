@@ -176,7 +176,7 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
 
                 var podIPKey [4]byte
                 // Pod IP is already in network byte order
-                copy (podIPKey[:], podIP.To4())
+                copy(podIPKey[:], podIP.To4())
                 // Convert pod port to network byte order
                 q := htons(uint16(podPort))
 
@@ -195,7 +195,7 @@ func addEndpointToMap(endpoint *v1.Endpoints, serviceInformer client_go_v1.Servi
                     if (err != nil) {
                         panic(err.Error())
                     }
-                    fmt.Printf("(+) %s:%d -> %s:%d\n", podIP, podPort, net.IP(value.IP[:]), value.Port)
+                    fmt.Printf("(+) %s:%d -> %s:%d\n", podIP, podPort, serviceIP, servicePort)
                 } else {
                     fmt.Printf("(.) key already exists and cannot be added: %s:%d\n", podIP, podPort)
                 }

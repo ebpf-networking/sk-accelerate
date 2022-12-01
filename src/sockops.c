@@ -57,10 +57,10 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value1.dport = service->port;
 
         bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
-        //bpf_printk("1: ipv4 op = %d, src %x:%d =>\n",
-            //skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
-        //bpf_printk("dst %x:%d\n",
-            //key1.dst.ip4, bpf_ntohl(key1.dport << 16));
+        bpf_printk("1: ipv4 op = %d, src %x:%d =>\n",
+            skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
+        bpf_printk("dst %x:%d\n",
+            key1.dst.ip4, bpf_ntohl(key1.dport << 16));
 
         key1.src.ip4 = service->ip;
         key1.sport = service->port;
@@ -75,10 +75,10 @@ void bpf_sock_ops_ipv4(struct bpf_sock_ops *skops)
         value1.dport = key.dport;
 
         bpf_map_update_elem(&sock_ops_aux_map, &key1, &value1, BPF_NOEXIST);
-        //bpf_printk("2: ipv4 op = %d, src %x:%d =>\n",
-            //skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
-        //bpf_printk("dst %x:%d\n",
-            //key1.dst.ip4, bpf_ntohl(key1.dport << 16));
+        bpf_printk("2: ipv4 op = %d, src %x:%d =>\n",
+            skops->op, key1.src.ip4, bpf_ntohl(key1.sport << 16));
+        bpf_printk("dst %x:%d\n",
+            key1.dst.ip4, bpf_ntohl(key1.dport << 16));
     
         key1.src.ip4 = key.dst.ip4;
         key1.sport = key.dport;

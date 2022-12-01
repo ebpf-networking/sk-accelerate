@@ -8,9 +8,9 @@
 
 #git clone https://github.com/brendangregg/FlameGraph.git
 
-iperf3_runtime=10
+iperf3_runtime=30
 wait_time=$((iperf3_runtime+10))
-buffer_len=512k
+buffer_len=128K
 
 function run_server()
 {
@@ -116,7 +116,7 @@ server_hostip=$(hostip_of pod1)
 server_uid=$(uid_of pod1)
 kubectl wait --for=condition=Ready pod/pod1
 #run_client_v6 ${client_hostname} $(pod_ip)
-run_client ${client_hostname} $(pod_ip)
+run_client ${client_hostname} $(svc_ip)
 client_hostip=$(hostip_of ${client_pod})
 client_uid=$(uid_of ${client_pod})
 kubectl wait --for=condition=Ready pod/${client_pod}
@@ -148,3 +148,4 @@ kubectl logs ${client_pod}
 kubectl delete pod pod1
 kubectl delete svc pod1
 kubectl delete job iperf3-client
+#rm -f client-job.yaml
