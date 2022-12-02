@@ -7,7 +7,7 @@
 # - perl
 
 netperf_runtime=5
-netperf_test=TCP_RR
+netperf_test=TCP_CRR
 wait_time=$((netperf_runtime+10))
 
 function run_server()
@@ -83,7 +83,7 @@ server_hostip=$(hostip_of pod1)
 server_uid=$(uid_of pod1)
 kubectl wait --for=condition=Ready pod/pod1
 #run_client_v6 ${client_hostname} $(pod_ip)
-run_client ${client_hostname} $(svc_ip)
+run_client ${client_hostname} $(pod_ip)
 client_hostip=$(hostip_of ${client_pod})
 client_uid=$(uid_of ${client_pod})
 kubectl wait --for=condition=Ready pod/${client_pod}
