@@ -6,8 +6,9 @@
 # - perf
 # - perl
 
-netperf_runtime=5
-netperf_test=TCP_CRR
+netperf_runtime=30
+# Other useful test is TCP_CRR
+netperf_test=TCP_RR
 wait_time=$((netperf_runtime+10))
 
 function run_server()
