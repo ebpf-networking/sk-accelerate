@@ -1,5 +1,12 @@
 # sk-accelerate
 
+sk-accelerate is a CNI-agnostic optimization that uses sockops/sockmap to accelerate TCP packets between communicating pods on the same host machine. By avoiding traversing the Linux network stacks, it allows for more efficient communication between a pair of local sockets. We support the following scenarios:
+- pod-to-pod (local)
+- pod-to-service (local)
+- ipv4/ipv6 dual-stack
+
+It should run on any CNI. We have tested it with Flannel, Cilium, Calico on Kubernetes and Openshift. 
+
 ## Prereq
 
 Need Linux kernel version >= 4.18
