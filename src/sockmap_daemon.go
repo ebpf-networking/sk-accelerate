@@ -4,8 +4,8 @@ import (
     "fmt"
     "os"
     "os/exec"
-    //"os/signal"
-    //"syscall"
+    "os/signal"
+    "syscall"
     "io"
     "time"
     "log"
@@ -151,7 +151,7 @@ func main() {
     fileCopy("/root/bin/sockmap_redir.o", "/opt/sockmap/sockmap_redir.o")
     fileCopy("/root/bin/sockops.o", "/opt/sockmap/sockops.o")
     fmt.Println("Done")
-/*
+
     // Load and attach ebpf program
     fmt.Print("Loading sockops program...")
     cmd := exec.Command("/opt/sockmap/bpftool", "prog", "load", "/opt/sockmap/sockops.o", "/sys/fs/bpf/sockop")
@@ -194,7 +194,7 @@ func main() {
     }()
 
     StartController()
-*/
+
 
     // TODO: need an API server to load/unload the sockmap program
     for {
